@@ -11,6 +11,7 @@ Federico Ceratto <federico@firelet.net>
 License: GPLv3
 """
 
+import atexit
 import i3
 import psutil
 from argparse import ArgumentParser
@@ -69,8 +70,14 @@ def parse_args():
     args = ap.parse_args()
 
 
+def continue_at_exit():
+    global args
+    stop_cont(args.process_name, True)
+
+
 def main():
     parse_args()
+    atexit.register(continue_at_exit)
     i3.subscribe('window', callback=focus_change)
 
 
