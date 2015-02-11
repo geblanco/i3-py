@@ -29,10 +29,11 @@ ModuleType = type(sys)
 
 
 __author__ = 'Jure Ziberna'
-__version__ = '0.6.5'
+__version__ = '0.6.6a'
 __date__ = '2012-06-20'
 __license__ = 'GNU GPL 3'
 
+# http://i3wm.org/docs/ipc.html
 
 MSG_TYPES = [
     'command',
@@ -47,6 +48,9 @@ MSG_TYPES = [
 EVENT_TYPES = [
     'workspace',
     'output',
+    'mode',
+    'window',
+    'barconfig_update',
 ]
 
 
@@ -305,7 +309,8 @@ class Subscription(threading.Thread):
     subscribed = False
     type_translation = {
         'workspace': 'get_workspaces',
-        'output': 'get_outputs'
+        'output': 'get_outputs',
+        'window': 'get_tree',
     }
 
     def __init__(self, callback, event_type, event=None, event_socket=None,
