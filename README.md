@@ -14,6 +14,7 @@ I'll be refering to i3 as _i3-wm_ from here on.
 
 Install
 -------
+Install this fork by cloning the depo and launch `python setup.py install`. The original package is available on pip:
 
     pip install i3-py
     # OR/AND (for Python 2.x)
@@ -181,8 +182,8 @@ import i3
 i3.subscribe('workspace')
 ```
 
-_Workspace_ is one of the two event types. The other one is _output_, which
-watches for output changes.
+_Workspace_ is one of the six event types. The others are _output_, _mode_, _barconfig_update_ and _window_, which
+watche respectively for changes in output, mode, barconfig and windows. ([usage example](examples/stop_application_on_unfocus.py) for _window_ event)
 
 Just displaying the list of workspaces isn't very useful, we want to actually
 do something. Because of that, you can define your own subscription:
