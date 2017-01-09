@@ -29,10 +29,11 @@ ModuleType = type(sys)
 
 
 __author__ = 'Jure Ziberna'
-__version__ = '0.6.5'
+__version__ = '0.6.6a'
 __date__ = '2012-06-20'
 __license__ = 'GNU GPL 3'
 
+# http://i3wm.org/docs/ipc.html
 
 MSG_TYPES = [
     'command',
@@ -47,39 +48,53 @@ MSG_TYPES = [
 EVENT_TYPES = [
     'workspace',
     'output',
+    'mode',
+    'window',
+    'barconfig_update',
 ]
 
 
 class i3Exception(Exception):
     pass
 
+
 class MessageTypeError(i3Exception):
+
     """
     Raised when message type isn't available. See i3.MSG_TYPES.
     """
+
     def __init__(self, type):
         msg = "Message type '%s' isn't available" % type
         super(MessageTypeError, self).__init__(msg)
 
+
 class EventTypeError(i3Exception):
+
     """
     Raised when even type isn't available. See i3.EVENT_TYPES.
     """
+
     def __init__(self, type):
         msg = "Event type '%s' isn't available" % type
         super(EventTypeError, self).__init__(msg)
 
+
 class MessageError(i3Exception):
+
     """
     Raised when a message to i3 is unsuccessful.
     That is, when it contains 'success': false in its JSON formatted response.
     """
     pass
 
+
 class ConnectionError(i3Exception):
+
     """
     Raised when a socket couldn't connect to the window manager.
     """
+
     def __init__(self, socket_path):
         msg = "Could not connect to socket at '%s'" % socket_path
         super(ConnectionError, self).__init__(msg)
@@ -102,6 +117,7 @@ def parse_msg_type(msg_type):
     else:
         raise MessageTypeError(msg_type)
 
+
 def parse_event_type(event_type):
     """
     Returns an i3-ipc string of the event_type. Raises an exception if
@@ -121,6 +137,7 @@ def parse_event_type(event_type):
 
 
 class Socket(object):
+
     """
     Socket for communicating with the i3 window manager.
     Optional arguments:
@@ -134,7 +151,7 @@ class Socket(object):
     chunk_size = 1024  # in bytes
     timeout = 0.5  # in seconds
     buffer = b''  # byte string
-    
+
     def __init__(self, path=None, timeout=None, chunk_size=None,
                  magic_string=None):
         if not path:
@@ -152,14 +169,14 @@ class Socket(object):
         # Struct format initialization, length of magic string is in bytes
         self.struct_header = '<%dsII' % len(self.magic_string.encode('utf-8'))
         self.struct_header_size = struct.calcsize(self.struct_header)
-    
+
     def initialize(self):
         """
         Initializes the socket.
         """
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.socket.settimeout(self.timeout)
-    
+
     def connect(self, path=None):
         """
         Connects the socket to socket path if not already connected.
@@ -172,7 +189,7 @@ class Socket(object):
                 self.socket.connect(path)
             except socket.error:
                 raise ConnectionError(path)
-    
+
     def get(self, msg_type, payload=''):
         """
         Convenience method, calls "socket.send(msg_type, payload)" and
@@ -180,7 +197,7 @@ class Socket(object):
         """
         self.send(msg_type, payload)
         return self.receive()
-    
+
     def subscribe(self, event_type, event=None):
         """
         Subscribes to an event. Returns data on first occurrence.
@@ -192,7 +209,7 @@ class Socket(object):
             payload.append(event)
         payload = json.dumps(payload)
         return self.get('subscribe', payload)
-    
+
     def send(self, msg_type, payload=''):
         """
         Sends the given message type with given message by packing them
@@ -201,7 +218,7 @@ class Socket(object):
         message = self.pack(msg_type, payload)
         # Continuously send the bytes from the message
         self.socket.sendall(message)
-    
+
     def receive(self):
         """
         Tries to receive a data. Unpacks the received byte string if
@@ -218,7 +235,7 @@ class Socket(object):
             return self.unpack(data)
         except socket.timeout:
             return None
-    
+
     def pack(self, msg_type, payload):
         """
         Packs the given message type and payload. Turns the resulting
@@ -234,7 +251,7 @@ class Socket(object):
         message = '%s%s%s%s' % (msg_magic, msg_length, msg_type, payload)
         # Encoding the message back to byte string
         return message.encode('utf-8')
-    
+
     def unpack(self, data):
         """
         Unpacks the given byte string and parses the result from JSON.
@@ -252,13 +269,13 @@ class Socket(object):
         else:
             self.buffer = data
             return None
-    
+
     def unpack_header(self, data):
         """
         Unpacks the header of given byte string.
         """
         return struct.unpack(self.struct_header, data[:self.struct_header_size])
-    
+
     @property
     def connected(self):
         """
@@ -269,7 +286,7 @@ class Socket(object):
             return True
         except socket.error:
             return False
-    
+
     def close(self):
         """
         Closes the socket connection.
@@ -278,6 +295,7 @@ class Socket(object):
 
 
 class Subscription(threading.Thread):
+
     """
     Creates a new subscription and runs a listener loop. Calls the
     callback on event.
@@ -291,9 +309,10 @@ class Subscription(threading.Thread):
     subscribed = False
     type_translation = {
         'workspace': 'get_workspaces',
-        'output': 'get_outputs'
+        'output': 'get_outputs',
+        'window': 'get_tree',
     }
-    
+
     def __init__(self, callback, event_type, event=None, event_socket=None,
                  data_socket=None):
         # Variable initialization
@@ -314,7 +333,7 @@ class Subscription(threading.Thread):
         # Thread initialization
         threading.Thread.__init__(self)
         self.start()
-    
+
     def run(self):
         """
         Wrapper method for the listen method -- handles exceptions.
@@ -324,7 +343,7 @@ class Subscription(threading.Thread):
             self.listen()
         except socket.error:
             self.close()
-    
+
     def listen(self):
         """
         Runs a listener loop until self.subscribed is set to False.
@@ -345,7 +364,7 @@ class Subscription(threading.Thread):
                 data = None
             self.callback(event, data, self)
         self.close()
-    
+
     def close(self):
         """
         Ends subscription loop by setting self.subscribed to False and
@@ -370,6 +389,8 @@ def __call_cmd__(cmd):
 
 
 __socket__ = None
+
+
 def default_socket(socket=None):
     """
     Returns i3.Socket object, which was initiliazed once with default values
@@ -401,7 +422,7 @@ def __function__(type, message='', *args, **crit):
     If message type was 'command', the function returns success value.
     """
     def function(*args2, **crit2):
-        msg_full = ' '.join([message] + list(args)  + list(args2))
+        msg_full = ' '.join([message] + list(args) + list(args2))
         criteria = dict(crit)
         criteria.update(crit2)
         if criteria:
@@ -412,7 +433,8 @@ def __function__(type, message='', *args, **crit):
             raise response
         return response
     function.__name__ = type
-    function.__doc__ = 'Message sender (type: %s, message: %s)' % (type, message)
+    function.__doc__ = 'Message sender (type: %s, message: %s)' % (
+        type, message)
     return function
 
 
@@ -427,9 +449,10 @@ def subscribe(event_type, event=None, callback=None):
             print('changed:', event['change'])
             if data:
                 print('data:\n', data)
-    
+
     socket = default_socket()
-    subscription = Subscription(callback, event_type, event, data_socket=socket)
+    subscription = Subscription(
+        callback, event_type, event, data_socket=socket)
     try:
         while True:
             time.sleep(1)
@@ -492,7 +515,7 @@ def parent(con_id, tree=None):
         return None
     return parents[0]
 
- 
+
 def filter(tree=None, function=None, **conditions):
     """
     Filters a tree based on given conditions. For example, to get a list of
@@ -529,13 +552,15 @@ def filter(tree=None, function=None, **conditions):
 
 
 class i3(ModuleType):
+
     """
     i3.py is a Python module for communicating with the i3 window manager.
     """
+
     def __init__(self, module):
         self.__module__ = module
         self.__name__ = module.__name__
-    
+
     def __getattr__(self, name):
         """
         Turns a nonexistent attribute into a function.
