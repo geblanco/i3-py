@@ -308,7 +308,8 @@ class Subscription(threading.Thread):
     subscribed = False
     type_translation = {
         'workspace': 'get_workspaces',
-        'output': 'get_outputs'
+        'output': 'get_outputs',
+        'window': 'get_tree',
     }
 
     def __init__(self, callback, event_type, event=None, event_socket=None,
